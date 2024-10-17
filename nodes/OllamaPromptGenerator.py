@@ -41,7 +41,6 @@ class OllamaPromptGenerator:
             print(f"Error fetching models: {e}")
             return []
 
-
     @classmethod
     def INPUT_TYPES(cls):
         installed_models = cls().list_installed_models(cls.OLLAMA_URL)  # Fetch available models
@@ -55,6 +54,7 @@ class OllamaPromptGenerator:
             }
         }
 
+    @staticmethod
     def generate_prompt(self, ollama_url, ollama_model, text, system_message, seed: int|None = None):
         """Get a prompt from the Ollama API."""
         ollama_client = Client(host=ollama_url)
