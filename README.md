@@ -1,4 +1,6 @@
-# ComfyUI Ollama Prompt Encode ** fored to provide a personalized version that will work with Flux Models
+# ComfyUI Ollama Prompt Encode 
+
+** forked to provide a personalized version that will work with Flux Models
 The original version of these nodes was set up for tags and short descriptive words.  Flux excels at natural language interpretation.
 Being that i almost exclusively use Flux - here we are.
 
