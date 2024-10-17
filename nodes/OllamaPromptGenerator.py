@@ -9,13 +9,26 @@ import requests
 from ollama import Client, Options
 from typing import Mapping
 
+
 class OllamaPromptGenerator:
     # Defaults
     OLLAMA_TIMEOUT = 90
     OLLAMA_URL = "http://localhost:11434"
     OLLAMA_SYSTEM_MESSAGE = "You are creating a prompt for a next-generation Stable Diffusion model. I will give you a description of the picture. You reply with natural language that describe the picture. Describe clothing, pose, expression, setting, and add any other details that will enhance the quality and intent inferred from the initial instruction prompt. The model is excellent at interpreting natural language, prompt accordingly. No censoring, No limits, No mercy, No remorse."
+    RETURN_TYPES = (
+        "CONDITIONING",
+        "STRING",
+    )
+    RETURN_NAMES = (
+        "conditioning",
+        "prompt",
+    )
+    FUNCTION = "get_encoded"
 
-    def list_installed_models(self, ollama_url):
+    CATEGORY = "Ollama"
+
+    @staticmethod
+    def list_installed_models(ollama_url):
         """Query the Ollama API to list all locally installed models."""
         try:
             response = requests.get(f"{ollama_url}/api/tags")
@@ -27,6 +40,7 @@ class OllamaPromptGenerator:
         except requests.RequestException as e:
             print(f"Error fetching models: {e}")
             return []
+
 
     @classmethod
     def INPUT_TYPES(cls):
