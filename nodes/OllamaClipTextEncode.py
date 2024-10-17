@@ -35,6 +35,10 @@ class OllamaCLIPTextEncode(OllamaPromptGenerator):
 
     CATEGORY = "Ollama"
 
+    def sanitize_prompt(self, prompt):
+        """Sanitize the prompt for use in clip encoding."""
+        return prompt.replace(".", ",")
+
     def get_encoded(self, clip, ollama_url, ollama_model, seed, system_message, text):
         """Gets and encodes the prompt using CLIP."""
         # Fetch and sanitize the prompt using inherited method
