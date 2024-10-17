@@ -32,8 +32,7 @@ class OllamaPromptGenerator:
 
     CATEGORY = "Ollama"
 
-    @staticmethod
-    def list_installed_models(ollama_url):
+    def list_installed_models(self, ollama_url):
         """Query the Ollama API to list all locally installed models."""
         try:
             response = requests.get(f"{ollama_url}/api/tags")
@@ -46,8 +45,7 @@ class OllamaPromptGenerator:
             print(f"Error fetching models: {e}")
             return []
 
-    @staticmethod
-    def unload_model(ollama_url, model_name):
+    def unload_model(self, ollama_url, model_name):
         """Unload the specified model."""
         try:
             response = requests.post(f"{ollama_url}/api/generate", json={
@@ -60,8 +58,7 @@ class OllamaPromptGenerator:
             print(f"Error unloading model {model_name}: {e}")
             return None
 
-    @classmethod
-    def INPUT_TYPES(cls):
+    def INPUT_TYPES(self, cls):
         installed_models = cls().list_installed_models(cls.OLLAMA_URL)  # Fetch available models
         return {
             "required": {
@@ -73,8 +70,7 @@ class OllamaPromptGenerator:
             }
         }
 
-    @staticmethod
-    def generate_prompt(ollama_url, ollama_model, text, system_message, seed: int | None = None):
+    def generate_prompt(self, ollama_url, ollama_model, text, system_message, seed: int | None = None):
         """Get a prompt from the Ollama API."""
         ollama_client = Client(host=ollama_url)
 
@@ -105,7 +101,6 @@ class OllamaPromptGenerator:
 
         return (combined_prompt,)
 
-    @staticmethod
-    def sanitize_prompt(prompt):
+    def sanitize_prompt(self, prompt):
         """Sanitize the prompt for use in clip encoding."""
         return prompt.replace(".", ",")
