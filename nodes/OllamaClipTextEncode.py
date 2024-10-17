@@ -21,6 +21,7 @@ class OllamaCLIPTextEncode(OllamaPromptGenerator):
                 "clip": ("CLIP",),
                 "ollama_url": ("STRING", {"default": cls.OLLAMA_URL}),
                 "ollama_model": ("COMBO", model_list),  # Use COMBO for dropdown
+                "keep_loaded": ("COMBO", ["Yes", "No"]),  # Dropdown for boolean
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "prepend_tags": ("STRING", {"multiline": True, "dynamicPrompts": True}),
                 "text": ("STRING", {"multiline": True, "dynamicPrompts": True}),
@@ -65,13 +66,18 @@ class OllamaCLIPTextEncode(OllamaPromptGenerator):
             print(f"Error unloading model {model_name}: {e}")
             return None
 
-    def get_encoded(self, clip, ollama_url, ollama_model, seed, prepend_tags, text):
-        # Unload the model before encoding
-        unload_response = self.unload_model(ollama_url, ollama_model)
-        if unload_response and unload_response.get("done"):
-            print(f"Successfully unloaded model: {unload_response['model']}")
-        else:
-            print("Failed to unload the model.")
+    def get_encoded(self, clip, ollama_url, ollama_model, seed, prepend_tags, text, keep_loaded):
+        # Convert keep_loaded to boolean
+        unload_model = keep_loaded == "No"  # 'No' means we want to unload
+
+        # Unload the model before encoding if specified
+        if unload_model:
+            unload_response = self.unload_model(ollama_url, ollama_model)
+            if unload_response and unload_response.get("done"):
+                print(f"Successfully unloaded model: {unload_response['model']}")
+            else:
+                print("Failed to unload the model.")
+
         """Gets and encodes the prompt using CLIP."""
         # Fetch and sanitize the prompt using inherited method
         combined_prompt = self.get_prompt(ollama_url, ollama_model, seed, prepend_tags, text)[0]
