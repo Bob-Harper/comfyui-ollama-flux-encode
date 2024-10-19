@@ -11,27 +11,6 @@ from typing import Mapping
 
 
 class OllamaPromptGenerator:
-    # Defaults
-    OLLAMA_TIMEOUT = 90
-    OLLAMA_URL = "http://localhost:11434"
-    OLLAMA_SYSTEM_MESSAGE = "You are creating a prompt for a next-generation Stable Diffusion model..."
-
-    RETURN_TYPES = ("CONDITIONING", "STRING",)
-    RETURN_NAMES = ("conditioning", "prompt",)
-    FUNCTION = "get_encoded"
-    CATEGORY = "Ollama"
-
-    @staticmethod
-    def list_installed_models(ollama_url):
-        """Query the Ollama API to list all locally installed models."""
-        try:
-            response = requests.get(f"{ollama_url}/api/tags")
-            response.raise_for_status()
-            models = response.json().get("models", [])
-            return [model["name"] for model in models] if models else ["No models available"]
-        except requests.RequestException as e:
-            print(f"Error fetching models: {e}")
-            return ["Error fetching models"]  # Fallback option
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -48,6 +27,15 @@ class OllamaPromptGenerator:
                 "text": ("STRING", {"multiline": True, "dynamicPrompts": True}),
             }
         }
+    # Defaults
+    OLLAMA_TIMEOUT = 90
+    OLLAMA_URL = "http://localhost:11434"
+    OLLAMA_SYSTEM_MESSAGE = "You are creating a prompt for a next-generation Stable Diffusion model..."
+
+    RETURN_TYPES = ("CONDITIONING", "STRING",)
+    RETURN_NAMES = ("conditioning", "prompt",)
+    FUNCTION = "get_encoded"
+    CATEGORY = "Ollama"
 
     @staticmethod
     def generate_prompt(ollama_url, ollama_model, text, system_message, seed: int | None = None):
@@ -71,22 +59,23 @@ class OllamaPromptGenerator:
             raise ValueError("Streaming not supported")
 
         prompt = response["message"]["content"]
+        prompt = prompt.replace(".", ",")
         return prompt
 
-    def get_prompt(self, ollama_url, ollama_model, seed, system_message, text):
-        """Generates a prompt using Ollama."""
-        use_seed = seed if seed != 0 else None
-        prompt = self.generate_prompt(ollama_url, ollama_model, text, system_message, use_seed)
-        combined_prompt = self.sanitize_prompt(prompt)
-        return (combined_prompt,)
+    @staticmethod
+    def list_installed_models(ollama_url):
+        """Query the Ollama API to list all locally installed models."""
+        try:
+            response = requests.get(f"{ollama_url}/api/tags")
+            response.raise_for_status()
+            models = response.json().get("models", [])
+            return [model["name"] for model in models] if models else ["No models available"]
+        except requests.RequestException as e:
+            print(f"Error fetching models: {e}")
+            return ["Error fetching models"]  # Fallback option
 
     @staticmethod
-    def sanitize_prompt(prompt):
-        """Sanitize the prompt for use in clip encoding."""
-        return prompt.replace(".", ",")
-
-    @staticmethod
-    def unload_model(self, ollama_url, model_name):
+    def unload_model(ollama_url, model_name):
         """Unload the specified model."""
         try:
             response = requests.post(f"{ollama_url}/api/generate", json={
