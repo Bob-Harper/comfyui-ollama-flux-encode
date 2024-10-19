@@ -14,12 +14,17 @@ class OllamaPromptGenerator:
     # Defaults
     OLLAMA_TIMEOUT = 90
     OLLAMA_URL = "http://localhost:11434"
-    OLLAMA_SYSTEM_MESSAGE = "You are creating a prompt for a next-generation Stable Diffusion model..."
+    OLLAMA_SYSTEM_MESSAGE = ("Use the supplied information to create a prompt for a next-generation "
+                             "Natural Language Stable Diffusion model. Respond with only the final constructed prompt."
+                             )
 
     @classmethod
     def INPUT_TYPES(cls):
-        installed_models = cls().list_installed_models(cls.OLLAMA_URL)  # Fetch available models
-        if not installed_models:
+        # Fetch available models when the node is initialized, not at class definition time.
+        try:
+            installed_models = cls.list_installed_models(cls.OLLAMA_URL)  # Fetch available models
+        except Exception as e:
+            print(f"Error fetching models: {e}")
             installed_models = ["No models available"]  # Handle empty list
 
         return {
@@ -35,8 +40,8 @@ class OllamaPromptGenerator:
     RETURN_TYPES = ("CONDITIONING", "STRING",)
     RETURN_NAMES = ("conditioning", "prompt",)
     FUNCTION = "generate_prompt"
-    CATEGORY = "FLuxOllama"
-    TITLE = "Ollama Prompt with Clip"
+    CATEGORY = "FluxOllama"
+    TITLE = "Ollama Prompt Generator"
 
     @staticmethod
     def generate_prompt(ollama_url, ollama_model, text, system_message, seed: int | None = None):
