@@ -8,6 +8,17 @@ from .OllamaPromptGenerator import OllamaPromptGenerator
 
 
 class OllamaCLIPTextEncode(OllamaPromptGenerator):
+    RETURN_TYPES = (
+        "CONDITIONING",
+        "STRING",
+    )
+    RETURN_NAMES = (
+        "conditioning",
+        "prompt",
+    )
+    FUNCTION = "get_encoded"
+
+    CATEGORY = "Ollama"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -25,17 +36,6 @@ class OllamaCLIPTextEncode(OllamaPromptGenerator):
                 "text": ("STRING", {"multiline": True, "dynamicPrompts": True}),
             }
         }
-    RETURN_TYPES = (
-        "CONDITIONING",
-        "STRING",
-    )
-    RETURN_NAMES = (
-        "conditioning",
-        "prompt",
-    )
-    FUNCTION = "get_encoded"
-
-    CATEGORY = "Ollama"
 
     def get_encoded(self, clip, ollama_url, ollama_model, seed, prepend_tags, text):
         """Gets and encodes the prompt using CLIP."""
