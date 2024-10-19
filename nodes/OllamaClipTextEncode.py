@@ -6,39 +6,27 @@
 """
 from .OllamaPromptGenerator import OllamaPromptGenerator
 
+
 class OllamaCLIPTextEncode(OllamaPromptGenerator):
 
     @classmethod
     def INPUT_TYPES(cls):
-        # Fetch available models when the node is initialized, not at class definition time.
-        try:
-            installed_models = cls.list_installed_models(cls.OLLAMA_URL)  # Fetch available models
-        except Exception as e:
-            print(f"Error fetching models: {e}")
-            installed_models = ["No models available"]  # Handle empty list
-
         return {
             "required": {
                 "clip": ("CLIP",),
-                "ollama_model": ("COMBO", {"default": installed_models[0], "choices": installed_models}),
+                "ollama_model": ("STRING", {"default": cls.OLLAMA_MODEL}),  # Hardcoded model field
                 "ollama_url": ("STRING", {"default": cls.OLLAMA_URL}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "system_message": ("STRING", {"default": cls.OLLAMA_SYSTEM_MESSAGE, "multiline": True}),
-                "text": ("STRING", {"multiline": True, "dynamicPrompts": True}),
+                "populated_text": ("STRING", {"multiline": True, "dynamicPrompts": False}),
+                "text": ("STRING", {"multiline": True}),
             }
         }
 
-    RETURN_TYPES = (
-        "CONDITIONING",
-        "STRING",
-    )
-    RETURN_NAMES = (
-        "conditioning",
-        "prompt",
-    )
+    RETURN_TYPES = ("CONDITIONING",)
+    RETURN_NAMES = ("STRING",)
     FUNCTION = "get_encoded"
     CATEGORY = "FluxOllama"
-    TITLE = "Ollama CLIP Prompt Encode"
+    TITLE = "Ollama Flux CLIP Prompt Encoder"
 
     def get_encoded(self, clip, ollama_url, ollama_model, seed, system_message, text):
         """Gets and encodes the prompt using CLIP."""

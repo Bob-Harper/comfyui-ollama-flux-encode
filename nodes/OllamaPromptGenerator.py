@@ -5,50 +5,41 @@
 @description: Use AI to generate Flux prompts
 """
 
-import requests
 from ollama import Client, Options
-from typing import Mapping
 
 
 class OllamaPromptGenerator:
     # Defaults
     OLLAMA_TIMEOUT = 90
     OLLAMA_URL = "http://localhost:11434"
+    OLLAMA_MODEL = "Llama3.2"  # Hardcoded for now
     OLLAMA_SYSTEM_MESSAGE = ("Use the supplied information to create a prompt for a next-generation "
                              "Natural Language Stable Diffusion model. Respond with only the final constructed prompt."
+                             "Begin the prompt with the words: This is an (art or photography style here) image of "
                              )
 
     @classmethod
     def INPUT_TYPES(cls):
-        # Fetch available models when the node is initialized, not at class definition time.
-        try:
-            installed_models = cls.list_installed_models(cls.OLLAMA_URL)  # Fetch available models
-        except Exception as e:
-            print(f"Error fetching models: {e}")
-            installed_models = ["No models available"]  # Handle empty list
-
         return {
             "required": {
-                "ollama_model": ("COMBO", {"default": installed_models[0], "choices": installed_models}),
+                "ollama_model": ("STRING", {"default": cls.OLLAMA_MODEL}),  # Hardcoded model field
                 "ollama_url": ("STRING", {"default": cls.OLLAMA_URL}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "system_message": ("STRING", {"default": cls.OLLAMA_SYSTEM_MESSAGE, "multiline": True}),
-                "text": ("STRING", {"multiline": True, "dynamicPrompts": True}),
+                "text": ("STRING", {"multiline": True}),
             }
         }
 
-    RETURN_TYPES = ("CONDITIONING", "STRING",)
-    RETURN_NAMES = ("conditioning", "prompt",)
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("prompt",)
     FUNCTION = "generate_prompt"
     CATEGORY = "FluxOllama"
-    TITLE = "Ollama Prompt Generator"
+    TITLE = "Ollama Flux Prompt Generator"
 
     @staticmethod
     def generate_prompt(ollama_url, ollama_model, text, system_message, seed: int | None = None):
         """Get a prompt from the Ollama API."""
         ollama_client = Client(host=ollama_url)
 
-        # Model should already exist based on dropdown, so we don't need to pull it.
         opts = Options()
         if seed is not None:
             opts["seed"] = seed
@@ -59,37 +50,6 @@ class OllamaPromptGenerator:
         ]
 
         response = ollama_client.chat(model=ollama_model, messages=messages, options=opts)
-
-        # Ensure valid response
-        if not isinstance(response, Mapping):
-            raise ValueError("Streaming not supported")
-
-        prompt = response["message"]["content"]
-        prompt = prompt.replace(".", ",")
-        return prompt
-
-    @staticmethod
-    def list_installed_models(ollama_url):
-        """Query the Ollama API to list all locally installed models."""
-        try:
-            response = requests.get(f"{ollama_url}/api/tags")
-            response.raise_for_status()
-            models = response.json().get("models", [])
-            return [model["name"] for model in models] if models else ["No models available"]
-        except requests.RequestException as e:
-            print(f"Error fetching models: {e}")
-            return ["Error fetching models"]  # Fallback option
-
-    @staticmethod
-    def unload_model(ollama_url, model_name):
-        """Unload the specified model."""
-        try:
-            response = requests.post(f"{ollama_url}/api/generate", json={
-                "model": model_name,
-                "keep_alive": 0
-            })
-            response.raise_for_status()
-            return response.json()
-        except requests.RequestException as e:
-            print(f"Error unloading model {model_name}: {e}")
-            return None
+        prompt = response["message"]["content"] + f" - Also include initial tags describing the image: {text}"
+        print("Full Response to send to the model:", prompt)  # Log the full response
+        return (prompt,)  # THIS NEEDS THE COMMA AFTER PROMPT.  don't ask why.  accept it.
