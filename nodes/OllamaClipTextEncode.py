@@ -35,7 +35,7 @@ class OllamaCLIPTextEncode(OllamaPromptGenerator):
     )
     FUNCTION = "get_encoded"
     TITLE = "Ollama Prompt with Clip"
-    CATEGORY = "Ollama"
+    CATEGORY = "FluxOllama"
 
     def get_encoded(self, clip, ollama_url, ollama_model, seed, prepend_tags, text):
         """Gets and encodes the prompt using CLIP."""

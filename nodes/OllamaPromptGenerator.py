@@ -11,6 +11,10 @@ from typing import Mapping
 
 
 class OllamaPromptGenerator:
+    # Defaults
+    OLLAMA_TIMEOUT = 90
+    OLLAMA_URL = "http://localhost:11434"
+    OLLAMA_SYSTEM_MESSAGE = "You are creating a prompt for a next-generation Stable Diffusion model..."
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -27,15 +31,11 @@ class OllamaPromptGenerator:
                 "text": ("STRING", {"multiline": True, "dynamicPrompts": True}),
             }
         }
-    # Defaults
-    OLLAMA_TIMEOUT = 90
-    OLLAMA_URL = "http://localhost:11434"
-    OLLAMA_SYSTEM_MESSAGE = "You are creating a prompt for a next-generation Stable Diffusion model..."
 
     RETURN_TYPES = ("CONDITIONING", "STRING",)
     RETURN_NAMES = ("conditioning", "prompt",)
-    FUNCTION = "get_encoded"
-    CATEGORY = "Ollama"
+    FUNCTION = "generate_prompt"
+    CATEGORY = "FLuxOllama"
     TITLE = "Ollama Prompt with Clip"
 
     @staticmethod
