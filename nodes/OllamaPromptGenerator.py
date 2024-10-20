@@ -22,7 +22,6 @@ class OllamaPromptGenerator:
             },
             "optional": {
                 "input_image": ("IMAGE",),  # Optional image input
-                "vae": ("VAE",),  # Optional VAE input
                 "clip": ("CLIP",),  # Optional CLIP input
                 "unload_model": ("BOOLEAN", {"default": False}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
@@ -30,15 +29,15 @@ class OllamaPromptGenerator:
         }
 
     # 'prompt' output added back, but it's optional to hook up
-    RETURN_TYPES = ("CONDITIONING", "STRING", "IMAGE", "LATENT", "STRING")
-    RETURN_NAMES = ("conditioning", "prompt", "image", "latent", "preview")
+    RETURN_TYPES = ("CONDITIONING", "STRING")
+    RETURN_NAMES = ("conditioning", "prompt")
     FUNCTION = "generate_prompt"
     CATEGORY = "Flux-O-llama"
     TITLE = "Ollama Flux Prompt Generator"
 
     @staticmethod
-    def generate_prompt(ollama_url, ollama_model, text, system_message, seed=None, input_image=None, vae=None,
-                        clip=None, latent=None, conditioning=None, unload_model=False):
+    def generate_prompt(ollama_url, ollama_model, text, system_message, seed=None, input_image=None,
+                        clip=None, conditioning=None, unload_model=False):
         """Generate a prompt using the Ollama API with optional multimodal inputs."""
         ollama_client = Client(host=ollama_url)
 
@@ -68,41 +67,19 @@ class OllamaPromptGenerator:
             print("CLIP input provided, processing CLIP embeddings...")
             conditioning = OllamaPromptGenerator.process_clip(clip)
 
-        # Placeholder for VAE processing
-        if vae is not None and input_image is not None:
-            print("VAE provided, encoding image...")
-            input_image = OllamaPromptGenerator.process_vae(vae, input_image)
-
-        # Placeholder for latent input processing
-        if latent is not None:
-            print("Latent input provided, processing latent...")
-            latent = OllamaPromptGenerator.process_latent(latent)
-
         # Unload model if option is selected (boolean Yes/No dropdown)
         if unload_model:
             print(f"Unloading model: {ollama_model}")
             OllamaPromptGenerator.unload_model(ollama_url, ollama_model)
 
         # Return conditioning, prompt, image, latent values, and preview (for display)
-        return conditioning, prompt, input_image, latent, {"ui": {"text": prompt, "editable": False}}
+        return conditioning, prompt, {"ui": {"text": prompt, "editable": False}}
 
     @staticmethod
     def process_clip(clip):
         """Placeholder function for CLIP processing."""
         # Add CLIP processing logic here
         return clip
-
-    @staticmethod
-    def process_vae(vae, input_image):
-        """Placeholder function for VAE processing."""
-        # Add VAE image encoding logic here
-        return input_image
-
-    @staticmethod
-    def process_latent(latent):
-        """Placeholder function for latent input processing."""
-        # Add latent processing logic here
-        return latent
 
     @staticmethod
     def unload_model(ollama_url, model_name):
