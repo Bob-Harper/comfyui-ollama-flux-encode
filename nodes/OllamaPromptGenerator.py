@@ -29,9 +29,9 @@ class OllamaPromptGenerator:
             }
         }
 
-    # Adjust RETURN_TYPES by making 'prompt' output optional
-    RETURN_TYPES = ("CONDITIONING", "IMAGE", "LATENT")
-    RETURN_NAMES = ("conditioning", "image", "latent")
+    # 'prompt' output added back, but it's optional to hook up
+    RETURN_TYPES = ("CONDITIONING", "STRING", "IMAGE", "LATENT", "STRING")
+    RETURN_NAMES = ("conditioning", "prompt", "image", "latent", "preview")
     FUNCTION = "generate_prompt"
     CATEGORY = "Flux-O-llama"
     TITLE = "Ollama Flux Prompt Generator"
@@ -83,8 +83,8 @@ class OllamaPromptGenerator:
             print(f"Unloading model: {ollama_model}")
             OllamaPromptGenerator.unload_model(ollama_url, ollama_model)
 
-        # View-only prompt (no output node)
-        return conditioning, input_image, latent, {"ui": {"text": prompt, "editable": False}}
+        # Return conditioning, prompt, image, latent values, and preview (for display)
+        return conditioning, prompt, input_image, latent, {"ui": {"text": prompt, "editable": False}}
 
     @staticmethod
     def process_clip(clip):
