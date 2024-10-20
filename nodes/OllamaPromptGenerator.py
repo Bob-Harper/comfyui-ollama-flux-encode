@@ -35,12 +35,12 @@ class OllamaPromptGenerator:
                 "clip": ("CLIP",),  # Optional CLIP input
                 "unload_model": ("BOOLEAN", {"default": False}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                "preview": ("STRING", {"default": "", "multiline": True, "placeholder": "Preview", "forceInput": True}),
+                "preview": ("STRING", {"default": "", "multiline": True, "placeholder": "Preview"}),
             }
         }
 
-    RETURN_TYPES = ("CONDITIONING", "STRING", "IMAGE", "LATENT")
-    RETURN_NAMES = ("conditioning", "prompt", "image", "latent")
+    RETURN_TYPES = ("CONDITIONING", "STRING", "IMAGE", "LATENT", "STRING")
+    RETURN_NAMES = ("conditioning", "prompt", "image", "latent", "preview")
     FUNCTION = "generate_prompt"
     CATEGORY = "Flux-O-llama"
     TITLE = "Ollama Flux Prompt Generator"
@@ -93,7 +93,7 @@ class OllamaPromptGenerator:
             OllamaPromptGenerator.unload_model(ollama_url, ollama_model)
 
         # Return conditioning, prompt, image, and latent values
-        return conditioning, prompt, input_image, latent
+        return conditioning, prompt, input_image, latent, {"ui": {"text": prompt}, "result": (prompt,)}
 
     @staticmethod
     def process_clip(clip):
