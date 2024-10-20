@@ -1,13 +1,5 @@
-"""
-@author: Bob Harper (building on the work of Michael Standen)
-@title: Ollama Flux Prompt Generator
-@nickname: Ollama Flux Prompt Generator
-@description: Use AI to generate Flux prompts
-"""
-
 from ollama import Client, Options
 import requests
-
 
 class OllamaPromptGenerator:
     # Defaults
@@ -27,7 +19,6 @@ class OllamaPromptGenerator:
                 "ollama_url": ("STRING", {"default": cls.OLLAMA_URL}),
                 "system_message": ("STRING", {"default": cls.OLLAMA_SYSTEM_MESSAGE, "multiline": True}),
                 "text": ("STRING", {"multiline": True}),
-
             },
             "optional": {
                 "input_image": ("IMAGE",),  # Optional image input
@@ -35,12 +26,12 @@ class OllamaPromptGenerator:
                 "clip": ("CLIP",),  # Optional CLIP input
                 "unload_model": ("BOOLEAN", {"default": False}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                "preview": ("STRING", {"default": "", "multiline": True, "placeholder": "Preview"}),
             }
         }
 
-    RETURN_TYPES = ("CONDITIONING", "STRING", "IMAGE", "LATENT", "STRING")
-    RETURN_NAMES = ("conditioning", "prompt", "image", "latent", "preview")
+    # Adjust RETURN_TYPES by making 'prompt' output optional
+    RETURN_TYPES = ("CONDITIONING", "IMAGE", "LATENT")
+    RETURN_NAMES = ("conditioning", "image", "latent")
     FUNCTION = "generate_prompt"
     CATEGORY = "Flux-O-llama"
     TITLE = "Ollama Flux Prompt Generator"
@@ -92,8 +83,8 @@ class OllamaPromptGenerator:
             print(f"Unloading model: {ollama_model}")
             OllamaPromptGenerator.unload_model(ollama_url, ollama_model)
 
-        # Return conditioning, prompt, image, and latent values
-        return conditioning, prompt, input_image, latent, {"ui": {"text": prompt}, "result": (prompt,)}
+        # View-only prompt (no output node)
+        return conditioning, input_image, latent, {"ui": {"text": prompt, "editable": False}}
 
     @staticmethod
     def process_clip(clip):
