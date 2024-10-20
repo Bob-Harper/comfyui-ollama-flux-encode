@@ -1,9 +1,11 @@
 from ollama import Client, Options
-import requests
-from ollama_helpers import OllamaHelpers
 import json
-
-ollama_helper = OllamaHelpers()
+import requests
+import aiohttp
+from tempfile import NamedTemporaryFile
+from PIL import Image
+import io
+import base64
 
 
 class OllamaPromptGenerator:
@@ -48,10 +50,6 @@ class OllamaPromptGenerator:
         opts = Options()
         if seed is not None and seed != 0:
             opts["seed"] = seed
-
-        # Initialize prompt to ensure it's always defined
-        prompt = ""  # Default initialization
-
         messages = [
             {"role": "system", "content": system_message},
             {"role": "user", "content": text},
@@ -60,46 +58,39 @@ class OllamaPromptGenerator:
         messages_string = json.dumps(messages)
         # Handle input image for multimodal models
         if input_image is not None:
-            try:
-                temp_image_path = ollama_helper.download_file(input_image.url)
-                encoded_image = ollama_helper.resize_and_encode_image(temp_image_path)
-                # Use the correct function to send the image
-                chat_response = ollama_client.generate(
-                    model=self.OLLAMA_MODEL,
-                    prompt=messages_string,
-                    images=[encoded_image],  # Wrap encoded image in a list
-                )
-
-                print(f"chat_response: {chat_response}")
-
-                # Check the response and extract content
-                if "response" in chat_response:
-                    prompt = chat_response["response"]
-                else:
-                    print("Ow my head..  who slipped what into my drink.....")
-
-            except Exception as e:
-                print(f"Something went wrong. I DO NOT LIKE BEING WRONG: {e}")
+            temp_image_path = OllamaHelpers.download_file(input_image.url)
+            encoded_image = OllamaHelpers.resize_and_encode_image(temp_image_path)
+            # Use the correct function to send the image
+            response = ollama_client.generate(
+                model=self.OLLAMA_MODEL,
+                prompt=messages_string,
+                images=[encoded_image],  # Wrap encoded image in a list
+            )
+            # Check the response and extract content
+            if "response" in response:
+                print(f"chat_response: {response}")
+            else:
+                print("Ow my head..  who slipped what into my drink.....")
 
         else:
-            # Call Ollama API to generate the prompt
-            response = ollama_client.chat(model=ollama_model, messages=messages, options=opts)
-            prompt = response["message"]["content"] + f" - initial tags: {text}"
+            # Call Ollama API to generate the prompt with no image
+            response = ollama_client.generate(model=ollama_model, prompt=messages_string, options=opts)
+            response = response["message"]["content"] + f" - initial tags: {text}"
 
         # Initialize conditioning outputs
         conditioning_positive = None  # Default empty for positive conditioning
         conditioning_negative = None
         if clip is not None:
             print("CLIP input provided, processing CLIP embeddings...")
-            conditioning_positive = self.process_clip(clip, prompt)  # Pass the prompt for processing
+            conditioning_positive = self.process_clip(clip, response)  # Pass the prompt for processing
             conditioning_negative = self.process_clip(clip, " ")  # Pass the prompt for processing
         # Unload model if option is selected (boolean Yes/No dropdown)
         if unload_model:
             print(f"Unloading model: {ollama_model}")
-            OllamaPromptGenerator.unload_model(ollama_url, ollama_model)
+            OllamaHelpers.unload_model(ollama_url, ollama_model)
 
         # Return conditioning+ (with clip processing), conditioning- (empty string), and prompt
-        return conditioning_positive, conditioning_negative, prompt  # Return prompt for further processing
+        return conditioning_positive, conditioning_negative, response  # Return prompt for further processing
 
     @staticmethod
     def process_clip(clip, prompt):
@@ -108,15 +99,53 @@ class OllamaPromptGenerator:
         cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
         return [[cond, {"pooled_output": pooled}]]  # Return the appropriate structure
 
-    @staticmethod
-    def unload_model(ollama_url, model_name):
-        """Unload the specified model to free up memory."""
+
+class OllamaHelpers:
+    def __init__(self, base_url="http://localhost:11434"):
+        self.base_url = base_url
+
+    def get_loaded_models(self):
+        """Check for loaded models."""
         try:
-            response = requests.post(f"{ollama_url}/api/generate", json={
+            response = requests.get(f"{self.base_url}/api/ps")
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            print(f"Error retrieving loaded models: {e}")
+            return None
+
+    def unload_model(self, model_name):
+        """Unload the specified model."""
+        try:
+            response = requests.post(f"{self.base_url}/api/generate", json={
                 "model": model_name,
                 "keep_alive": 0
             })
             response.raise_for_status()
-            print(f"Model {model_name} unloaded successfully.")
+            return response.json()
         except requests.RequestException as e:
             print(f"Error unloading model {model_name}: {e}")
+            return None
+
+    @staticmethod
+    async def download_file(url: str) -> str:
+        """Download a file from a URL and return the path to the downloaded file."""
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    # Create a temporary file
+                    with NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
+                        temp_file.write(await resp.read())
+                        return temp_file.name
+                else:
+                    raise FileNotFoundError(f"Failed to download file from {url}. Status code: {resp.status}")
+
+    @staticmethod
+    def resize_and_encode_image(ximage_path, max_size=(512, 512)):
+        with Image.open(ximage_path) as img:
+            img.thumbnail(max_size)
+            buffer = io.BytesIO()
+            img.save(buffer, format="PNG")
+            buffer.seek(0)
+            encoded_image = base64.b64encode(buffer.read()).decode()
+            return encoded_image
