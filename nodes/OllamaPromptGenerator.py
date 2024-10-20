@@ -1,9 +1,8 @@
 from ollama import Client, Options
 import json
 import requests
-import aiohttp
-from tempfile import NamedTemporaryFile
 from PIL import Image
+import torchvision.transforms as transforms
 import io
 import base64
 
@@ -35,7 +34,6 @@ class OllamaPromptGenerator:
             }
         }
 
-    # All three outputs are defined
     RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "STRING")
     RETURN_NAMES = ("conditioning+", "conditioning-", "prompt")
     FUNCTION = "generate_prompt"
@@ -54,99 +52,96 @@ class OllamaPromptGenerator:
             {"role": "system", "content": system_message},
             {"role": "user", "content": text},
         ]
-        # Convert to a JSON string
         messages_string = json.dumps(messages)
 
-        # Handle input image for multimodal models
+        # Handle the single input image for multimodal models
+        # Handle the single input image for multimodal models
         if input_image is not None:
-            temp_image_path = OllamaHelpers.download_file(input_image.url)
-            encoded_image = OllamaHelpers.resize_and_encode_image(temp_image_path)
-            # Use the correct function to send the image
-            response = ollama_client.generate(
-                model=self.OLLAMA_MODEL,
-                prompt=messages_string,
-                images=[encoded_image],  # Wrap encoded image in a list
-            )
-            print(f"model response w image: {response}")
+            # Ensure correct dimensions: 4D tensor [1, channels, height, width]
+            if input_image.ndimension() == 4:
+                print(f"Original Image dimensions: {input_image.size()}")  # Log the image dimensions
+
+                # Remove the batch dimension and keep only the first 3 channels (RGB)
+                input_image = input_image[0, :3, :, :]  # Remove batch and select RGB channels
+
+                print(
+                    f"Processed Image dimensions (after batch removal): {input_image.size()}")  # Log the processed dimensions
+
+                # Convert the tensor image to a PIL Image and resize/encode
+                try:
+                    encoded_image = OllamaHelpers.resize_and_encode_image(input_image)
+                    print(f"Encoded image: {encoded_image[:30]}...")
+
+                    # Make API request with the image
+                    response = ollama_client.generate(
+                        model=ollama_model,
+                        prompt=messages_string,
+                        images=[encoded_image],  # Pass the encoded image
+                    )
+                except Exception as e:
+                    print(f"Error processing image: {e}")
+                    response = {"response": ""}  # Handle any failure gracefully
+            else:
+                print(f"Unexpected image dimensions: {input_image.ndimension()} dimensions found.")
+                response = {"response": ""}
 
         else:
-            # Call Ollama API to generate the prompt with no image
+            # Call Ollama API to generate the prompt without an image
             response = ollama_client.generate(model=ollama_model, prompt=messages_string, options=opts)
-            print(f"model response wo image: {response}")
+            print(f"Model response without image: {response}")
 
-        # Extract the prompt correctly
+        # Extract the prompt from the response
         imageprompt = response.get("response", "") + f" - initial tags: {text}"
 
-        # Initialize conditioning outputs
-        conditioning_positive = None  # Default empty for positive conditioning
+        # Handle CLIP conditioning if provided
+        conditioning_positive = None
         conditioning_negative = None
         if clip is not None:
-            print("CLIP input provided, processing CLIP embeddings...")
-            conditioning_positive = self.process_clip(clip, imageprompt)  # Pass the prompt for processing
-            conditioning_negative = self.process_clip(clip, " ")  # Pass the prompt for processing
+            conditioning_positive = self.process_clip(clip, imageprompt)  # Pass the prompt to CLIP
+            conditioning_negative = self.process_clip(clip, " ")  # Send an empty prompt for negative conditioning
 
-        # Unload model if option is selected (boolean Yes/No dropdown)
+        # Unload the model if the option is selected
         if unload_model:
-            print(f"Unloading model: {ollama_model}")
             OllamaHelpers.unload_model(ollama_url, ollama_model)
 
-        # Return conditioning+ (with clip processing), conditioning- (empty string), and the prompt string
-        return conditioning_positive, conditioning_negative, imageprompt  # Return the formatted prompt string instead of response
+        # Return positive conditioning, negative conditioning, and the prompt
+        return conditioning_positive, conditioning_negative, imageprompt
 
     @staticmethod
     def process_clip(clip, prompt):
-        """Gets and encodes the prompt using CLIP."""
+        """Process the prompt with CLIP."""
         tokens = clip.tokenize(prompt)
         cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
-        return [[cond, {"pooled_output": pooled}]]  # Return the appropriate structure
+        return [[cond, {"pooled_output": pooled}]]  # Return CLIP conditioning
 
 
 class OllamaHelpers:
-    def __init__(self, base_url="http://localhost:11434"):
-        self.base_url = base_url
+    @staticmethod
+    def resize_and_encode_image(tensor_image):
+        """Resize the image and encode it as base64."""
+        # Convert tensor to PIL Image
+        pil_image = transforms.ToPILImage()(tensor_image)
 
-    def get_loaded_models(self):
-        """Check for loaded models."""
-        try:
-            response = requests.get(f"{self.base_url}/api/ps")
-            response.raise_for_status()
-            return response.json()
-        except requests.RequestException as e:
-            print(f"Error retrieving loaded models: {e}")
-            return None
+        # Resize the image to max 512x512
+        max_size = 512
+        pil_image.thumbnail((max_size, max_size))
 
-    def unload_model(self, model_name):
-        """Unload the specified model."""
+        # Convert image to bytes and encode to base64
+        buffered = io.BytesIO()
+        pil_image.save(buffered, format="PNG")
+        encoded_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+        return encoded_image
+
+    @staticmethod
+    def unload_model(ollama_url, model_name):
+        """Unload the model."""
         try:
-            response = requests.post(f"{self.base_url}/api/generate", json={
+            response = requests.post(f"{ollama_url}/api/generate", json={
                 "model": model_name,
                 "keep_alive": 0
             })
             response.raise_for_status()
-            return response.json()
+            print(f"Model {model_name} unloaded successfully.")
         except requests.RequestException as e:
             print(f"Error unloading model {model_name}: {e}")
-            return None
-
-    @staticmethod
-    async def download_file(url: str) -> str:
-        """Download a file from a URL and return the path to the downloaded file."""
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
-                if resp.status == 200:
-                    # Create a temporary file
-                    with NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
-                        temp_file.write(await resp.read())
-                        return temp_file.name
-                else:
-                    raise FileNotFoundError(f"Failed to download file from {url}. Status code: {resp.status}")
-
-    @staticmethod
-    def resize_and_encode_image(ximage_path, max_size=(512, 512)):
-        with Image.open(ximage_path) as img:
-            img.thumbnail(max_size)
-            buffer = io.BytesIO()
-            img.save(buffer, format="PNG")
-            buffer.seek(0)
-            encoded_image = base64.b64encode(buffer.read()).decode()
-            return encoded_image
