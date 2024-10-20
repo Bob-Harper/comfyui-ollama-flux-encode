@@ -56,6 +56,7 @@ class OllamaPromptGenerator:
         ]
         # Convert to a JSON string
         messages_string = json.dumps(messages)
+
         # Handle input image for multimodal models
         if input_image is not None:
             temp_image_path = OllamaHelpers.download_file(input_image.url)
@@ -66,31 +67,31 @@ class OllamaPromptGenerator:
                 prompt=messages_string,
                 images=[encoded_image],  # Wrap encoded image in a list
             )
-            # Check the response and extract content
-            if "response" in response:
-                print(f"chat_response: {response}")
-            else:
-                print("Ow my head..  who slipped what into my drink.....")
+            print(f"model response w image: {response}")
 
         else:
             # Call Ollama API to generate the prompt with no image
             response = ollama_client.generate(model=ollama_model, prompt=messages_string, options=opts)
-            response = response["message"]["content"] + f" - initial tags: {text}"
+            print(f"model response wo image: {response}")
+
+        # Extract the prompt correctly
+        imageprompt = response.get("response", "") + f" - initial tags: {text}"
 
         # Initialize conditioning outputs
         conditioning_positive = None  # Default empty for positive conditioning
         conditioning_negative = None
         if clip is not None:
             print("CLIP input provided, processing CLIP embeddings...")
-            conditioning_positive = self.process_clip(clip, response)  # Pass the prompt for processing
+            conditioning_positive = self.process_clip(clip, imageprompt)  # Pass the prompt for processing
             conditioning_negative = self.process_clip(clip, " ")  # Pass the prompt for processing
+
         # Unload model if option is selected (boolean Yes/No dropdown)
         if unload_model:
             print(f"Unloading model: {ollama_model}")
             OllamaHelpers.unload_model(ollama_url, ollama_model)
 
-        # Return conditioning+ (with clip processing), conditioning- (empty string), and prompt
-        return conditioning_positive, conditioning_negative, response  # Return prompt for further processing
+        # Return conditioning+ (with clip processing), conditioning- (empty string), and the prompt string
+        return conditioning_positive, conditioning_negative, imageprompt  # Return the formatted prompt string instead of response
 
     @staticmethod
     def process_clip(clip, prompt):
