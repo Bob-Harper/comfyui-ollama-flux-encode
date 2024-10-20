@@ -1,7 +1,6 @@
 from ollama import Client, Options
 import json
 import requests
-from PIL import Image
 import torchvision.transforms as transforms
 import io
 import base64
@@ -13,8 +12,9 @@ class OllamaPromptGenerator:
     OLLAMA_URL = "http://localhost:11434"
     OLLAMA_MODEL = "llava-llama3"  # Hardcoded for now
     OLLAMA_SYSTEM_MESSAGE = ("Use the supplied information to create a prompt for a next-generation "
-                             "Natural Language Stable Diffusion model. Respond with only the final constructed prompt."
-                             "Begin the prompt with the words: This is an (art or photography style here) image of "
+                             "Natural Language Stable Diffusion model. The Flux model responds exceedingly well to "
+                             "wordy descriptions, thematic elements, setting the mood and feel.  "
+                             "Format your response as if you are describing the final image. "
                              )
 
     @classmethod
@@ -27,8 +27,8 @@ class OllamaPromptGenerator:
                 "text": ("STRING", {"multiline": True}),
             },
             "optional": {
-                "input_image": ("IMAGE",),  # Optional image input
                 "clip": ("CLIP",),  # Optional CLIP input
+                "input_image": ("IMAGE",),  # Optional image input
                 "unload_model": ("BOOLEAN", {"default": False}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
             }
@@ -59,19 +59,11 @@ class OllamaPromptGenerator:
         if input_image is not None:
             # Ensure correct dimensions: 4D tensor [1, channels, height, width]
             if input_image.ndimension() == 4:
-                print(f"Original Image dimensions: {input_image.size()}")  # Log the image dimensions
-
                 # Remove the batch dimension and keep only the first 3 channels (RGB)
                 input_image = input_image[0, :3, :, :]  # Remove batch and select RGB channels
-
-                print(
-                    f"Processed Image dimensions (after batch removal): {input_image.size()}")  # Log the processed dimensions
-
                 # Convert the tensor image to a PIL Image and resize/encode
                 try:
                     encoded_image = OllamaHelpers.resize_and_encode_image(input_image)
-                    print(f"Encoded image: {encoded_image[:30]}...")
-
                     # Make API request with the image
                     response = ollama_client.generate(
                         model=ollama_model,
@@ -88,7 +80,6 @@ class OllamaPromptGenerator:
         else:
             # Call Ollama API to generate the prompt without an image
             response = ollama_client.generate(model=ollama_model, prompt=messages_string, options=opts)
-            print(f"Model response without image: {response}")
 
         # Extract the prompt from the response
         imageprompt = response.get("response", "") + f" - initial tags: {text}"
