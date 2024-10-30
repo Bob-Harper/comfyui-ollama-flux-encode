@@ -7,33 +7,35 @@ class OllamaPromptGenerator:
     # Defaults
     OLLAMA_TIMEOUT = 90
     OLLAMA_URL = "http://localhost:11434"
-    OLLAMA_MODEL = "tinyllama:latest"  # Hardcoded for now
-    OLLAMA_SYSTEM_MESSAGE = ("Use the supplied information to create a prompt for a next-generation "
-                             "Natural Language Stable Diffusion model. Respond with only the final constructed prompt."
-                             "Begin the prompt with the words: This is an (art or photography style here) image of "
+    OLLAMA_SYSTEM_MESSAGE = ("Use the supplied information to create a prompt for a "
+                             "Natural Language Stable Diffusion model. "
+                             "Begin the prompt with this style of wording: "
+                             "This is an (art or photography style here) image of ... "
+                             "Please provide a fully constructed ready to use prompt using the following information: "
                              )
 
     @classmethod
     def INPUT_TYPES(cls):
+        model_names = OllamaHelpers.get_available_models()
         return {
             "required": {
-                "ollama_model": ("STRING", {"default": cls.OLLAMA_MODEL}),
-                "ollama_url": ("STRING", {"default": cls.OLLAMA_URL}),
-                "system_message": ("STRING", {"default": cls.OLLAMA_SYSTEM_MESSAGE, "multiline": True}),
-                "text": ("STRING", {"multiline": True}),
+                "Ollama Model": (model_names,),  # Use dynamic model names here
+                "Ollama URL": ("STRING", {"default": cls.OLLAMA_URL}),
+                "System Prompt": ("STRING", {"default": cls.OLLAMA_SYSTEM_MESSAGE, "multiline": True}),
+                "Supplied Text": ("STRING", {"multiline": True}),
             },
             "optional": {
-                "clip": ("CLIP",),
-                "input_image": ("IMAGE",),
-                "unload_model": ("BOOLEAN", {"default": False}),
-                "use_full_prompt": ("BOOLEAN", {"default": False}),  # New switch for prompt type
-                "seed": ("INT", {"default": 1, "min": 1, "max": 0xffffffffffffffff}),
+                "CLIP": ("CLIP",),
+                "Input Image": ("IMAGE",),
+                "Unload after Generating": ("BOOLEAN", {"default": False}),
+                "Append Original Prompt": ("BOOLEAN", {"default": False}),  # New switch for prompt type
+                "Seed": ("INT", {"default": 1, "min": 1, "max": 0xffffffffffffffff}),
             }
         }
 
     # Update RETURN_TYPES and RETURN_NAMES to include both outputs
     RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "STRING", "STRING")
-    RETURN_NAMES = ("conditioning+", "conditioning-", "generated_prompt", "full_prompt")
+    RETURN_NAMES = ("Conditioning +", "Conditioning -", "Generated Prompt", "Combined Prompt")
     FUNCTION = "generate_prompt"
     CATEGORY = "Flux-O-llama"
 
@@ -92,7 +94,7 @@ class OllamaPromptGenerator:
                 conditioning_negative = self.process_clip(clip, " ")  # empty prompt for negative conditioning
 
         if unload_model:
-            OllamaHelpers.unload_model(ollama_url, ollama_model)
+            OllamaHelpers.unload_model(ollama_model)
 
         # Return positive conditioning, negative conditioning, and the prompt
         return conditioning_positive, conditioning_negative, generated_response, full_prompt
