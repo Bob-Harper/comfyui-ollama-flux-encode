@@ -7,6 +7,8 @@ class OllamaPromptGenerator:
     # Defaults
     OLLAMA_TIMEOUT = 90
     OLLAMA_URL = "http://localhost:11434"
+    OLLAMA_GENERATED_TEXT = "Generated results will display here."
+    OLLAMA_DEFAULT_TEXT = "Your supplied text here.  It can be regular description, tags, combination of the above."
     OLLAMA_SYSTEM_MESSAGE = ("Use the supplied information to create a prompt for a "
                              "Natural Language Stable Diffusion model. "
                              "Begin the prompt with this style of wording: "
@@ -22,7 +24,8 @@ class OllamaPromptGenerator:
                 "Ollama Model": (model_names,),  # Use dynamic model names here
                 "Ollama URL": ("STRING", {"default": cls.OLLAMA_URL}),
                 "System Prompt": ("STRING", {"default": cls.OLLAMA_SYSTEM_MESSAGE, "multiline": True}),
-                "Supplied Text": ("STRING", {"multiline": True}),
+                "Supplied Text": ("STRING", {"default": cls.OLLAMA_DEFAULT_TEXT, "multiline": True}),
+                "generated_prompt": ("STRING", {"default": cls.OLLAMA_GENERATED_TEXT, "readonly": True}),
             },
             "optional": {
                 "CLIP": ("CLIP",),
@@ -35,7 +38,7 @@ class OllamaPromptGenerator:
 
     # Update RETURN_TYPES and RETURN_NAMES to include both outputs
     RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "STRING", "STRING")
-    RETURN_NAMES = ("Conditioning +", "Conditioning -", "Generated Prompt", "Combined Prompt")
+    RETURN_NAMES = ("+Conditioning", "-Conditioning", "Generated Prompt", "Combined Prompt")
     FUNCTION = "generate_prompt"
     CATEGORY = "Flux-O-llama"
 
