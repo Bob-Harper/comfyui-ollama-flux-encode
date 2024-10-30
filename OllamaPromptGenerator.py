@@ -1,20 +1,16 @@
 from ollama import Client, Options
 import json
-import requests
-import torchvision.transforms as transforms
-import io
-import base64
+from .ollama_helpers import OllamaHelpers
 
 
 class OllamaPromptGenerator:
     # Defaults
     OLLAMA_TIMEOUT = 90
     OLLAMA_URL = "http://localhost:11434"
-    OLLAMA_MODEL = "llava-llama3"  # Hardcoded for now
+    OLLAMA_MODEL = "tinyllama:latest"  # Hardcoded for now
     OLLAMA_SYSTEM_MESSAGE = ("Use the supplied information to create a prompt for a next-generation "
-                             "Natural Language Stable Diffusion model. The Flux model responds exceedingly well to "
-                             "wordy descriptions, thematic elements, setting the mood and feel.  "
-                             "Format your response as if you are describing the final image. "
+                             "Natural Language Stable Diffusion model. Respond with only the final constructed prompt."
+                             "Begin the prompt with the words: This is an (art or photography style here) image of "
                              )
 
     @classmethod
@@ -27,27 +23,28 @@ class OllamaPromptGenerator:
                 "text": ("STRING", {"multiline": True}),
             },
             "optional": {
-                "clip": ("CLIP",),  # Optional CLIP input
-                "input_image": ("IMAGE",),  # Optional image input
+                "clip": ("CLIP",),
+                "input_image": ("IMAGE",),
                 "unload_model": ("BOOLEAN", {"default": False}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
+                "use_full_prompt": ("BOOLEAN", {"default": False}),  # New switch for prompt type
+                "seed": ("INT", {"default": 1, "min": 1, "max": 0xffffffffffffffff}),
             }
         }
 
-    RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "STRING")
-    RETURN_NAMES = ("conditioning+", "conditioning-", "prompt")
+    # Update RETURN_TYPES and RETURN_NAMES to include both outputs
+    RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "STRING", "STRING")
+    RETURN_NAMES = ("conditioning+", "conditioning-", "generated_prompt", "full_prompt")
     FUNCTION = "generate_prompt"
     CATEGORY = "Flux-O-llama"
-    TITLE = "Ollama Flux Prompt Generator"
 
     def generate_prompt(self, ollama_url, ollama_model, text, system_message, seed=None, input_image=None,
-                        clip=None, unload_model=False):
-        """Generate a prompt using the Ollama API with optional multimodal inputs."""
+                        clip=None, unload_model=False, use_full_prompt=False):
         ollama_client = Client(host=ollama_url)
 
         opts = Options()
         if seed is not None and seed != 0:
             opts["seed"] = seed
+
         messages = [
             {"role": "system", "content": system_message},
             {"role": "user", "content": text},
@@ -82,21 +79,23 @@ class OllamaPromptGenerator:
             response = ollama_client.generate(model=ollama_model, prompt=messages_string, options=opts)
 
         # Extract the prompt from the response
-        imageprompt = response.get("response", "") + f" - initial tags: {text}"
-
-        # Handle CLIP conditioning if provided
+        full_prompt = response.get("response", "") + f" - initial tags: {text}"
+        generated_response = response.get("response", "")
         conditioning_positive = None
         conditioning_negative = None
         if clip is not None:
-            conditioning_positive = self.process_clip(clip, imageprompt)  # Pass the prompt to CLIP
-            conditioning_negative = self.process_clip(clip, " ")  # Send an empty prompt for negative conditioning
+            if use_full_prompt:  # Pass the full joined prompt to CLIP
+                conditioning_positive = self.process_clip(clip, full_prompt)
+                conditioning_negative = self.process_clip(clip, " ")  # empty prompt for negative conditioning
+            else:  # Pass only the generated prompt to CLIP
+                conditioning_positive = self.process_clip(clip, generated_response)
+                conditioning_negative = self.process_clip(clip, " ")  # empty prompt for negative conditioning
 
-        # Unload the model if the option is selected
         if unload_model:
             OllamaHelpers.unload_model(ollama_url, ollama_model)
 
         # Return positive conditioning, negative conditioning, and the prompt
-        return conditioning_positive, conditioning_negative, imageprompt
+        return conditioning_positive, conditioning_negative, generated_response, full_prompt
 
     @staticmethod
     def process_clip(clip, prompt):
@@ -104,35 +103,3 @@ class OllamaPromptGenerator:
         tokens = clip.tokenize(prompt)
         cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
         return [[cond, {"pooled_output": pooled}]]  # Return CLIP conditioning
-
-
-class OllamaHelpers:
-    @staticmethod
-    def resize_and_encode_image(tensor_image):
-        """Resize the image and encode it as base64."""
-        # Convert tensor to PIL Image
-        pil_image = transforms.ToPILImage()(tensor_image)
-
-        # Resize the image to max 512x512
-        max_size = 512
-        pil_image.thumbnail((max_size, max_size))
-
-        # Convert image to bytes and encode to base64
-        buffered = io.BytesIO()
-        pil_image.save(buffered, format="PNG")
-        encoded_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
-
-        return encoded_image
-
-    @staticmethod
-    def unload_model(ollama_url, model_name):
-        """Unload the model."""
-        try:
-            response = requests.post(f"{ollama_url}/api/generate", json={
-                "model": model_name,
-                "keep_alive": 0
-            })
-            response.raise_for_status()
-            print(f"Model {model_name} unloaded successfully.")
-        except requests.RequestException as e:
-            print(f"Error unloading model {model_name}: {e}")
