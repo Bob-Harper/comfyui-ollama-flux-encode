@@ -1,7 +1,8 @@
+import base64
+import io
+
 import requests
 import torchvision.transforms as transforms
-import io
-import base64
 
 
 class OllamaHelpers:

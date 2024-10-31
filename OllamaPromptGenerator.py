@@ -1,8 +1,11 @@
-from ollama import Client, Options
 import json
+
+from ollama import Client, Options
+
 from .ollama_helpers import OllamaHelpers
 
 
+# noinspection PyPep8Naming
 class OllamaPromptGenerator:
     # Defaults
     OLLAMA_URL = "http://localhost:11434"
@@ -29,7 +32,7 @@ class OllamaPromptGenerator:
             "optional": {
                 "clip": ("CLIP",),
                 "input_image": ("IMAGE",),
-                "unload_model": ("BOOLEAN", {"default": True}),  # Unload model to free up VRAM for image generation
+                "unload_model": ("BOOLEAN", {"default": True}),  # Unloads model to free up VRAM for image generation
                 "use_full_prompt": ("BOOLEAN", {"default": False}),  # Append original input to generated prompt
                 "seed": ("INT", {"default": 1, "min": 1, "max": 0xffffffffffffffff}),
             }
@@ -51,7 +54,7 @@ class OllamaPromptGenerator:
             {"role": "user", "content": text},
         ]
         messages_string = json.dumps(messages)
-        # Handles image input for multimodal models, image data ignored by text-only models.
+        # Handles optional image input for multimodal models, image data ignored by text-only models.
         if input_image is not None:
             # Ensure correct dimensions: 4D tensor [1, channels, height, width]
             if input_image.ndimension() == 4:
@@ -84,13 +87,13 @@ class OllamaPromptGenerator:
         if clip is not None:
             if use_full_prompt:  # Pass the full joined prompt to CLIP
                 conditioning_positive = self.process_clip(clip, full_prompt)
-                conditioning_negative = self.process_clip(clip, neg_prompt)  # empty prompt for negative conditioning
+                conditioning_negative = self.process_clip(clip, neg_prompt)
             else:  # Pass only the generated prompt to CLIP
                 conditioning_positive = self.process_clip(clip, generated_response)
-                conditioning_negative = self.process_clip(clip, neg_prompt)  # empty prompt for negative conditioning
+                conditioning_negative = self.process_clip(clip, neg_prompt)
         if unload_model:
             OllamaHelpers.unload_model(ollama_model)
-        # Return positive conditioning, negative conditioning, and the prompt
+        # Return positive conditioning, negative conditioning, and both prompts for view/save/log nodes.
         return conditioning_positive, conditioning_negative, generated_response, full_prompt
 
     @staticmethod
