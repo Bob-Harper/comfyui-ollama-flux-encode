@@ -5,7 +5,6 @@ from ollama import Client, Options
 from .ollama_helpers import OllamaHelpers
 
 
-# noinspection PyPep8Naming
 class OllamaPromptGenerator:
     # Defaults
     OLLAMA_URL = "http://localhost:11434"
@@ -41,6 +40,13 @@ class OllamaPromptGenerator:
     RETURN_NAMES = ("conditioning+", "conditioning-", "generated_prompt", "full_prompt")
     FUNCTION = "generate_prompt"
     CATEGORY = "Flux-O-llama"
+
+    @staticmethod
+    def process_clip(clip, prompt):
+        """Process the prompt with CLIP."""
+        tokens = clip.tokenize(prompt)
+        cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
+        return [[cond, {"pooled_output": pooled}]]  # Return CLIP conditioning
 
     def generate_prompt(self, ollama_model, ollama_url, system_message, text, neg_prompt, clip=None, input_image=None,
                         unload_model=True, use_full_prompt=False, seed=None,):
@@ -95,10 +101,3 @@ class OllamaPromptGenerator:
             OllamaHelpers.unload_model(ollama_model)
         # Return positive conditioning, negative conditioning, and both prompts for view/save/log nodes.
         return conditioning_positive, conditioning_negative, generated_response, full_prompt
-
-    @staticmethod
-    def process_clip(clip, prompt):
-        """Process the prompt with CLIP."""
-        tokens = clip.tokenize(prompt)
-        cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
-        return [[cond, {"pooled_output": pooled}]]  # Return CLIP conditioning
