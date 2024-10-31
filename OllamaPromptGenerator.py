@@ -12,36 +12,36 @@ class OllamaPromptGenerator:
                              "This is an (art or photography style here) image of ... "
                              "Please provide a fully constructed ready to use prompt using the following information: "
                              )
+    NEGATIVE_PROMPT = "Negative Prompt goes here - Not used if using Flux Models. Text here will not be sent to Ollama."
+    POSITIVE_PROMPT = "Positive Prompt - Put your starter prompt and/or tags here.  This will send to Ollama."
 
     @classmethod
     def INPUT_TYPES(cls):
-        model_names = OllamaHelpers.get_available_models()
+        model_names = OllamaHelpers.get_available_models()  # Query Ollama API to retrieve installed models
         return {
             "required": {
-                "ollama_model": (model_names,),  # Use dynamic model names here
+                "ollama_model": (model_names,),  # Use retrieved model names here.  Will default to first listed.
                 "ollama_url": ("STRING", {"default": cls.OLLAMA_URL}),
                 "system_message": ("STRING", {"default": cls.OLLAMA_SYSTEM_MESSAGE, "multiline": True}),
-                "text": ("STRING", {"multiline": True}),
+                "text": ("STRING", {"default": cls.POSITIVE_PROMPT, "multiline": True}),
+                "neg_prompt": ("STRING", {"default": cls.NEGATIVE_PROMPT, "multiline": True}),
             },
             "optional": {
                 "clip": ("CLIP",),
                 "input_image": ("IMAGE",),
-                "unload_model": ("BOOLEAN", {"default": False}),
-                "use_full_prompt": ("BOOLEAN", {"default": False}),  # New switch for prompt type
+                "unload_model": ("BOOLEAN", {"default": True}),  # Unload model to free up VRAM for image generation
+                "use_full_prompt": ("BOOLEAN", {"default": False}),  # Append original input to generated prompt
                 "seed": ("INT", {"default": 1, "min": 1, "max": 0xffffffffffffffff}),
             }
         }
-
-    # Update RETURN_TYPES and RETURN_NAMES to include both outputs
     RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "STRING", "STRING")
     RETURN_NAMES = ("conditioning+", "conditioning-", "generated_prompt", "full_prompt")
     FUNCTION = "generate_prompt"
     CATEGORY = "Flux-O-llama"
 
-    def generate_prompt(self, ollama_url, ollama_model, text, system_message, seed=None, input_image=None,
-                        clip=None, unload_model=False, use_full_prompt=False):
+    def generate_prompt(self, ollama_model, ollama_url, system_message, text, neg_prompt, clip=None, input_image=None,
+                        unload_model=True, use_full_prompt=False, seed=None,):
         ollama_client = Client(host=ollama_url)
-
         opts = Options()
         if seed is not None and seed != 0:
             opts["seed"] = seed
@@ -51,9 +51,7 @@ class OllamaPromptGenerator:
             {"role": "user", "content": text},
         ]
         messages_string = json.dumps(messages)
-
-        # Handle the single input image for multimodal models
-        # Handle the single input image for multimodal models
+        # Handles image input for multimodal models, image data ignored by text-only models.
         if input_image is not None:
             # Ensure correct dimensions: 4D tensor [1, channels, height, width]
             if input_image.ndimension() == 4:
@@ -78,7 +76,6 @@ class OllamaPromptGenerator:
         else:
             # Call Ollama API to generate the prompt without an image
             response = ollama_client.generate(model=ollama_model, prompt=messages_string, options=opts)
-
         # Extract the prompt from the response
         full_prompt = response.get("response", "") + f" - initial tags: {text}"
         generated_response = response.get("response", "")
@@ -87,14 +84,12 @@ class OllamaPromptGenerator:
         if clip is not None:
             if use_full_prompt:  # Pass the full joined prompt to CLIP
                 conditioning_positive = self.process_clip(clip, full_prompt)
-                conditioning_negative = self.process_clip(clip, " ")  # empty prompt for negative conditioning
+                conditioning_negative = self.process_clip(clip, neg_prompt)  # empty prompt for negative conditioning
             else:  # Pass only the generated prompt to CLIP
                 conditioning_positive = self.process_clip(clip, generated_response)
-                conditioning_negative = self.process_clip(clip, " ")  # empty prompt for negative conditioning
-
+                conditioning_negative = self.process_clip(clip, neg_prompt)  # empty prompt for negative conditioning
         if unload_model:
             OllamaHelpers.unload_model(ollama_model)
-
         # Return positive conditioning, negative conditioning, and the prompt
         return conditioning_positive, conditioning_negative, generated_response, full_prompt
 

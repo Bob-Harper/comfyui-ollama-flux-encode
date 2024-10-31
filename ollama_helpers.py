@@ -45,3 +45,4 @@ class OllamaHelpers:
 
 # Fetch available models at startup
 _available_models = OllamaHelpers.get_available_models()
+print(f"Available Ollama Models: ", _available_models)
