@@ -27,8 +27,7 @@ If you have the [ComfyUI Manager](https://github.com/ltdrdata/ComfyUI-Manager) i
 Clone this repository into your `<comfyui>/custom_nodes` directory.
 
 ```sh
-cd <comfyui>/custom_nodes
-git clone https://github.com/Bob-Harper/comfyui-ollama-flux-encode](https://github.com/Bob-Harper/comfyui-ollama-flux-encode)
+git clone https://github.com/Bob-Harper/comfyui-ollama-flux-encode.git
 ```
 
 ## Usage
