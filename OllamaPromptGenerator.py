@@ -16,6 +16,7 @@ class OllamaPromptGenerator:
                              "a prompt. Do not give instructions on creating the prompt.  You are creating the "
                              "prompt, and You are sending it to the model immediately."
                              )
+    OLLAMA_SYSTEM_PROMPT = "This is the system prompt, gives the model instructions on how to respond."
     NEGATIVE_PROMPT = "Negative Prompt goes here - Not used if using Flux Models. Text here will not be sent to Ollama."
     POSITIVE_PROMPT = "Positive Prompt - Put your starter prompt and/or tags here.  This will send to Ollama."
 
@@ -26,25 +27,24 @@ class OllamaPromptGenerator:
             "required": {
                 "ollama_model": (model_names,),  # Use retrieved model names here.  Will default to first listed.
                 "ollama_url": ("STRING", {"default": cls.OLLAMA_URL}),
-                "system_message": ("STRING", {"placeholder": cls.OLLAMA_SYSTEM_MESSAGE,
+                "system_message": ("STRING", {"placeholder": cls.OLLAMA_SYSTEM_PROMPT,
                                               "default": cls.OLLAMA_SYSTEM_MESSAGE, "multiline": True}),
-                "text": ("STRING", {"placeholder": cls.POSITIVE_PROMPT, "default": cls.POSITIVE_PROMPT,
-                                    "multiline": True}),
-                "neg_prompt": ("STRING", {"placeholder": cls.NEGATIVE_PROMPT, "default": cls.NEGATIVE_PROMPT,
-                                          "multiline": True}),
+                "starter_prompt": ("STRING", {"placeholder": cls.POSITIVE_PROMPT, "multiline": True}),
+                "neg_prompt": ("STRING", {"placeholder": cls.NEGATIVE_PROMPT, "multiline": True}),
             },
             "optional": {
                 "clip": ("CLIP",),
                 "input_image": ("IMAGE",),
-                "prepend_text": ("STRING", {"forceInput": True}),  #
+                "prepend_text": ("STRING", {"forceInput": True}),  # Useful for specific model tags, lora keywords, etc
                 "unload_model": ("BOOLEAN", {"default": True}),  # Unloads model to free up VRAM for image generation
-                "use_full_prompt": ("BOOLEAN", {"default": False}),  # Append original input to generated prompt
+                "use_joined_prompt": ("BOOLEAN", {"default": False}),  # Append original input to generated prompt
                 "log_to_file": ("BOOLEAN", {"default": False}),  # log everything to a textfile
                 "seed": ("INT", {"default": 1, "min": 1, "max": 0xffffffffffffffff}),
-            }
+            },
         }
+
     RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "STRING", "STRING")
-    RETURN_NAMES = ("conditioning+", "conditioning-", "generated_prompt", "full_prompt")
+    RETURN_NAMES = ("conditioning+", "conditioning-", "generated_prompt", "joined_prompt")
     FUNCTION = "generate_prompt"
     CATEGORY = "Flux-O-llama"
 
@@ -55,8 +55,9 @@ class OllamaPromptGenerator:
         cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
         return [[cond, {"pooled_output": pooled}]]  # Return CLIP conditioning
 
-    def generate_prompt(self, ollama_model, ollama_url, system_message, text, neg_prompt, clip=None, input_image=None,
-                        prepend_text=None, unload_model=True, use_full_prompt=False, log_to_file=False, seed=None,):
+    def generate_prompt(self, ollama_model, ollama_url, system_message, starter_prompt, neg_prompt, clip=None,
+                        input_image=None, prepend_text=None, unload_model=True, use_joined_prompt=False,
+                        log_to_file=False, seed=None):
         ollama_client = Client(host=ollama_url)
         opts = Options()
         if seed is not None and seed != 0:
@@ -64,7 +65,7 @@ class OllamaPromptGenerator:
 
         messages = [
             {"role": "system", "content": system_message},
-            {"role": "user", "content": text},
+            {"role": "user", "content": starter_prompt},
         ]
         messages_string = json.dumps(messages)
         # Handles optional image input for multimodal models, image data ignored by text-only models.
@@ -96,7 +97,7 @@ class OllamaPromptGenerator:
         else:
             prepend = ""
         returned_prompt = response.get("response", "")
-        full_prompt = prepend + returned_prompt + f" - initial tags: {text}"
+        joined_prompt = prepend + returned_prompt + f" - initial tags: {starter_prompt}"
         generated_response = prepend + returned_prompt
 
         if log_to_file:
@@ -114,7 +115,7 @@ class OllamaPromptGenerator:
                     file.write("Timestamp:      " + str(dt_string) + '\n')
                     file.write("System Prompt:  " + str(system_message) + '\n')
                     file.write("Prepend Text:   " + str(prepend_text) + '\n')
-                    file.write("Input Text:     " + str(text) + '\n')
+                    file.write("Input Text:     " + str(starter_prompt) + '\n')
                     file.write("Seed:           " + str(seed) + '\n')
                     file.write("Generated Text: " + str(returned_prompt) + '\n\n')
                     print(f"Log entry written to {log_file}")  # Debugging print statement
@@ -125,8 +126,8 @@ class OllamaPromptGenerator:
         conditioning_positive = None
         conditioning_negative = None
         if clip is not None:
-            if use_full_prompt:  # Pass the full joined prompt to CLIP
-                conditioning_positive = self.process_clip(clip, full_prompt)
+            if use_joined_prompt:  # Pass the full joined prompt to CLIP
+                conditioning_positive = self.process_clip(clip, joined_prompt)
                 conditioning_negative = self.process_clip(clip, neg_prompt)
             else:  # Pass only the generated prompt to CLIP
                 conditioning_positive = self.process_clip(clip, generated_response)
@@ -134,4 +135,4 @@ class OllamaPromptGenerator:
         if unload_model:
             OllamaHelpers.unload_model(ollama_model)
         # Return positive conditioning, negative conditioning, and both prompts for view/save/log nodes.
-        return conditioning_positive, conditioning_negative, generated_response, full_prompt
+        return conditioning_positive, conditioning_negative, generated_response, joined_prompt
