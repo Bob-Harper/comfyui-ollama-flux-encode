@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from ollama import Client, Options
-
+import os
 from .ollama_helpers import OllamaHelpers
 
 
@@ -26,9 +26,12 @@ class OllamaPromptGenerator:
             "required": {
                 "ollama_model": (model_names,),  # Use retrieved model names here.  Will default to first listed.
                 "ollama_url": ("STRING", {"default": cls.OLLAMA_URL}),
-                "system_message": ("STRING", {"default": cls.OLLAMA_SYSTEM_MESSAGE, "multiline": True}),
-                "text": ("STRING", {"default": cls.POSITIVE_PROMPT, "multiline": True}),
-                "neg_prompt": ("STRING", {"default": cls.NEGATIVE_PROMPT, "multiline": True}),
+                "system_message": ("STRING", {"placeholder": cls.OLLAMA_SYSTEM_MESSAGE,
+                                              "default": cls.OLLAMA_SYSTEM_MESSAGE, "multiline": True}),
+                "text": ("STRING", {"placeholder": cls.POSITIVE_PROMPT, "default": cls.POSITIVE_PROMPT,
+                                    "multiline": True}),
+                "neg_prompt": ("STRING", {"placeholder": cls.NEGATIVE_PROMPT, "default": cls.NEGATIVE_PROMPT,
+                                          "multiline": True}),
             },
             "optional": {
                 "clip": ("CLIP",),
@@ -95,17 +98,30 @@ class OllamaPromptGenerator:
         returned_prompt = response.get("response", "")
         full_prompt = prepend + returned_prompt + f" - initial tags: {text}"
         generated_response = prepend + returned_prompt
+
         if log_to_file:
-            now = datetime.now()
-            dt_string = now.strftime("%Y-%m-%d %H:%M:%S")
-            with open('logs/logged_prompts.txt', 'w') as file:
-                # write variables using str() function
-                file.write("Timestamp:      " + str(dt_string) + '\n')
-                file.write("System Prompt:  " + str(system_message) + '\n')
-                file.write("Prepend Text:   " + str(prepend_text) + '\n')
-                file.write("Input Text:     " + str(text) + '\n')
-                file.write("Seed:           " + str(seed) + '\n')
-                file.write("Generated Text: " + str(returned_prompt) + '\n\n')
+            try:
+                # Create directory if it doesn't exist
+                log_dir = os.path.join(os.path.dirname(__file__), 'logs')
+                log_file = os.path.join(log_dir, 'logged_prompts.txt')
+                os.makedirs(log_dir, exist_ok=True)
+                # Get current timestamp
+                now = datetime.now()
+                dt_string = now.strftime("%Y-%m-%d %H:%M:%S")
+                # Open the file in append mode ('a') to add entries without overwriting
+                with open(log_file, 'a') as file:
+                    # Write variables to the file
+                    file.write("Timestamp:      " + str(dt_string) + '\n')
+                    file.write("System Prompt:  " + str(system_message) + '\n')
+                    file.write("Prepend Text:   " + str(prepend_text) + '\n')
+                    file.write("Input Text:     " + str(text) + '\n')
+                    file.write("Seed:           " + str(seed) + '\n')
+                    file.write("Generated Text: " + str(returned_prompt) + '\n\n')
+                    print(f"Log entry written to {log_file}")  # Debugging print statement
+
+            except Exception as e:
+                print(f"Error while creating log file: {e}")
+
         conditioning_positive = None
         conditioning_negative = None
         if clip is not None:
