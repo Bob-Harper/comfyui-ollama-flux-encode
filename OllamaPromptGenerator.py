@@ -1,5 +1,5 @@
 import json
-
+from datetime import datetime
 from ollama import Client, Options
 
 from .ollama_helpers import OllamaHelpers
@@ -13,8 +13,8 @@ class OllamaPromptGenerator:
                              "followed by the supplied elements and additional described elements.  If an image is "
                              "supplied then use the elements in the image to enhance the prompt. Be verbose and "
                              "use full descriptive sentences. Do not describe the prompt. Do not say you are creating "
-                             "a prompt. Do not give instructions on creating the prompt.  YOU are creating the "
-                             "prompt, and YOU are sending it to the model immediately."
+                             "a prompt. Do not give instructions on creating the prompt.  You are creating the "
+                             "prompt, and You are sending it to the model immediately."
                              )
     NEGATIVE_PROMPT = "Negative Prompt goes here - Not used if using Flux Models. Text here will not be sent to Ollama."
     POSITIVE_PROMPT = "Positive Prompt - Put your starter prompt and/or tags here.  This will send to Ollama."
@@ -36,6 +36,7 @@ class OllamaPromptGenerator:
                 "prepend_text": ("STRING", {"forceInput": True}),  #
                 "unload_model": ("BOOLEAN", {"default": True}),  # Unloads model to free up VRAM for image generation
                 "use_full_prompt": ("BOOLEAN", {"default": False}),  # Append original input to generated prompt
+                "log_to_file": ("BOOLEAN", {"default": False}),  # log everything to a textfile
                 "seed": ("INT", {"default": 1, "min": 1, "max": 0xffffffffffffffff}),
             }
         }
@@ -52,7 +53,7 @@ class OllamaPromptGenerator:
         return [[cond, {"pooled_output": pooled}]]  # Return CLIP conditioning
 
     def generate_prompt(self, ollama_model, ollama_url, system_message, text, neg_prompt, clip=None, input_image=None,
-                        prepend_text=None, unload_model=True, use_full_prompt=False, seed=None,):
+                        prepend_text=None, unload_model=True, use_full_prompt=False, log_to_file=False, seed=None,):
         ollama_client = Client(host=ollama_url)
         opts = Options()
         if seed is not None and seed != 0:
@@ -65,13 +66,9 @@ class OllamaPromptGenerator:
         messages_string = json.dumps(messages)
         # Handles optional image input for multimodal models, image data ignored by text-only models.
         if input_image is not None:
-            print("Yes there is an image!")
             # Ensure correct dimensions: 4D tensor [1, channels, height, width]
             try:
                 encoded_image = OllamaHelpers.resize_and_encode_image(input_image)
-                print("The image is encoded!")
-                print(f"This is what the image looks like to the LLM: {encoded_image[:100]}...")
-
                 # Make API request with the image
                 response = ollama_client.generate(
                     model=ollama_model,
@@ -79,7 +76,6 @@ class OllamaPromptGenerator:
                     options=opts,
                     images=[encoded_image],  # Pass the encoded image
                 )
-                print(f"This is the image response from the LLM: {response}")
             except Exception as e:
                 print(f"Error processing image: {e}")
                 response = {"response": ""}
@@ -96,8 +92,20 @@ class OllamaPromptGenerator:
             prepend = prepend_text
         else:
             prepend = ""
-        full_prompt = prepend + response.get("response", "") + f" - initial tags: {text}"
-        generated_response = prepend + response.get("response", "")
+        returned_prompt = response.get("response", "")
+        full_prompt = prepend + returned_prompt + f" - initial tags: {text}"
+        generated_response = prepend + returned_prompt
+        if log_to_file:
+            now = datetime.now()
+            dt_string = now.strftime("%Y-%m-%d %H:%M:%S")
+            with open('logs/logged_prompts.txt', 'w') as file:
+                # write variables using str() function
+                file.write("Timestamp:      " + str(dt_string) + '\n')
+                file.write("System Prompt:  " + str(system_message) + '\n')
+                file.write("Prepend Text:   " + str(prepend_text) + '\n')
+                file.write("Input Text:     " + str(text) + '\n')
+                file.write("Seed:           " + str(seed) + '\n')
+                file.write("Generated Text: " + str(returned_prompt) + '\n\n')
         conditioning_positive = None
         conditioning_negative = None
         if clip is not None:
@@ -111,16 +119,3 @@ class OllamaPromptGenerator:
             OllamaHelpers.unload_model(ollama_model)
         # Return positive conditioning, negative conditioning, and both prompts for view/save/log nodes.
         return conditioning_positive, conditioning_negative, generated_response, full_prompt
-
-
-"""
-if input_image.ndimension() == 4:
-    # Remove the batch dimension and keep only the first 3 channels (RGB)
-    input_image = input_image[0, :3, :, :]  # Remove batch and select RGB channels
-    # Convert the tensor image to a PIL Image and resize/encode
-    print("The image is good!")
-
-else:
-    print(f"Unexpected image dimensions: {input_image.ndimension()} dimensions found.")
-    response = {"response": ""}    
-"""

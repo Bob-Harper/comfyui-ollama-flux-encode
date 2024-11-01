@@ -33,8 +33,6 @@ class OllamaHelpers:
         buffered = io.BytesIO()
         pil_image.save(buffered, format="PNG")
         encoded_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-        print(f"Encoded image length: {len(encoded_image)} characters")
         return encoded_image
 
     @classmethod
