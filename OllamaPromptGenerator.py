@@ -37,7 +37,7 @@ class OllamaPromptGenerator:
                 "input_image": ("IMAGE",),
                 "prepend_text": ("STRING", {"forceInput": True}),  # Useful for specific model tags, lora keywords, etc
                 "unload_model": ("BOOLEAN", {"default": True}),  # Unloads model to free up VRAM for image generation
-                "use_joined_prompt": ("BOOLEAN", {"default": False}),  # Append original input to generated prompt
+                "use_conjoined_prompt": ("BOOLEAN", {"default": False}),  # Append original input to generated prompt
                 "log_to_file": ("BOOLEAN", {"default": False}),  # log everything to a textfile
                 "seed": ("INT", {"default": 1, "min": 1, "max": 0xffffffffffffffff}),
             },
@@ -56,7 +56,7 @@ class OllamaPromptGenerator:
         return [[cond, {"pooled_output": pooled}]]  # Return CLIP conditioning
 
     def generate_prompt(self, ollama_model, ollama_url, system_message, starter_prompt, neg_prompt, clip=None,
-                        input_image=None, prepend_text=None, unload_model=True, use_joined_prompt=False,
+                        input_image=None, prepend_text=None, unload_model=True, use_conjoined_prompt=False,
                         log_to_file=False, seed=None):
         ollama_client = Client(host=ollama_url)
         opts = Options()
@@ -97,10 +97,11 @@ class OllamaPromptGenerator:
         else:
             prepend = ""
         returned_prompt = response.get("response", "")
-        if use_joined_prompt:
-            generated_response = prepend + returned_prompt + f" - initial tags: {starter_prompt}"
+        if use_conjoined_prompt:
+            starter_prompt = starter_prompt
+            generated_response = prepend + ", \n" + returned_prompt + ", \n" + starter_prompt
         else:
-            generated_response = prepend + returned_prompt
+            generated_response = prepend + ", \n" + returned_prompt
 
         if log_to_file:
             try:
