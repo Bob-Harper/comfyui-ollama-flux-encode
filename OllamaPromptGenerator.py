@@ -97,6 +97,7 @@ class OllamaPromptGenerator:
         else:
             prepend = ""
         returned_prompt = response.get("response", "")
+
         joined_prompt = prepend + returned_prompt + f" - initial tags: {starter_prompt}"
         generated_response = prepend + returned_prompt
 
@@ -135,4 +136,4 @@ class OllamaPromptGenerator:
         if unload_model:
             OllamaHelpers.unload_model(ollama_model)
         # Return positive conditioning, negative conditioning, and both prompts for view/save/log nodes.
-        return conditioning_positive, conditioning_negative, generated_response, joined_prompt
+        return conditioning_positive, conditioning_negative, generated_response, joined_prompt, returned_prompt
