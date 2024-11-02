@@ -43,8 +43,8 @@ class OllamaPromptGenerator:
             },
         }
 
-    RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "STRING", "STRING")
-    RETURN_NAMES = ("conditioning+", "conditioning-", "generated_prompt", "joined_prompt")
+    RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "STRING")
+    RETURN_NAMES = ("conditioning+", "conditioning-", "generated_prompt")
     FUNCTION = "generate_prompt"
     CATEGORY = "Flux-O-llama"
 
@@ -97,9 +97,10 @@ class OllamaPromptGenerator:
         else:
             prepend = ""
         returned_prompt = response.get("response", "")
-
-        joined_prompt = prepend + returned_prompt + f" - initial tags: {starter_prompt}"
-        generated_response = prepend + returned_prompt
+        if use_joined_prompt:
+            generated_response = prepend + returned_prompt + f" - initial tags: {starter_prompt}"
+        else:
+            generated_response = prepend + returned_prompt
 
         if log_to_file:
             try:
@@ -127,13 +128,9 @@ class OllamaPromptGenerator:
         conditioning_positive = None
         conditioning_negative = None
         if clip is not None:
-            if use_joined_prompt:  # Pass the full joined prompt to CLIP
-                conditioning_positive = self.process_clip(clip, joined_prompt)
-                conditioning_negative = self.process_clip(clip, neg_prompt)
-            else:  # Pass only the generated prompt to CLIP
-                conditioning_positive = self.process_clip(clip, generated_response)
-                conditioning_negative = self.process_clip(clip, neg_prompt)
+            conditioning_positive = self.process_clip(clip, generated_response)
+            conditioning_negative = self.process_clip(clip, neg_prompt)
         if unload_model:
             OllamaHelpers.unload_model(ollama_model)
         # Return positive conditioning, negative conditioning, and both prompts for view/save/log nodes.
-        return conditioning_positive, conditioning_negative, generated_response, joined_prompt, returned_prompt
+        return conditioning_positive, conditioning_negative, generated_response
