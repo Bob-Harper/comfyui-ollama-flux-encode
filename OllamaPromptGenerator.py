@@ -70,19 +70,14 @@ class OllamaPromptGenerator:
         messages_string = json.dumps(messages)
         # Handles optional image input for multimodal models, image data ignored by text-only models.
         if input_image is not None:
-            # Ensure correct dimensions: 4D tensor [1, channels, height, width]
-            try:
-                encoded_image = OllamaHelpers.resize_and_encode_image(input_image)
-                # Make API request with the image
-                response = ollama_client.generate(
-                    model=ollama_model,
-                    prompt=messages_string,
-                    options=opts,
-                    images=[encoded_image],  # Pass the encoded image
-                )
-            except Exception as e:
-                print(f"Error processing image: {e}")
-                response = {"response": ""}
+            # Make API request with the image
+            encoded_image = OllamaHelpers.resize_and_encode_image(input_image)
+            response = ollama_client.generate(
+                model=ollama_model,
+                prompt=messages_string,
+                options=opts,
+                images=[encoded_image],
+            )
 
         else:
             # Call Ollama API to generate the prompt without an image
@@ -91,12 +86,15 @@ class OllamaPromptGenerator:
                 prompt=messages_string,
                 options=opts,
             )
+
+        returned_prompt = response.get("response", "")
+
         # Extract the prompt from the response
         if prepend_text is not None:
             prepend = prepend_text
         else:
             prepend = ""
-        returned_prompt = response.get("response", "")
+
         if use_conjoined_prompt:
             starter_prompt = starter_prompt
             generated_response = prepend + ", \n" + returned_prompt + ", \n" + starter_prompt
